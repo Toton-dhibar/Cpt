@@ -183,6 +183,7 @@ class WalletHunter:
             trx_address = derive_trx_address(phrase)
             sol_address = derive_sol_address(phrase)
         except (MnemonicChecksumError, ValueError):
+            # Skip invalid mnemonic without stopping worker threads
             return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
