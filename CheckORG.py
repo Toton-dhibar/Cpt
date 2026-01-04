@@ -20,8 +20,8 @@ from bip_utils import (
 
 MAX_PHRASE_ATTEMPTS = 1000
 # Fallback price guardrail (manual) in case price API is blocked/offline. Updated 2026-01.
-FALLBACK_SOL_PRICE = 150
-# Tiny heuristic bump when tokens exist but SOL balance is zero.
+FALLBACK_SOL_PRICE = 150  # manual fallback; adjust whenever market price meaningfully changes
+# Tiny heuristic bump when tokens exist but SOL balance is zero. This does NOT reflect real token prices.
 TOKEN_HEURISTIC_VALUE = 0.000001
 
 BIP39_WORDS = [
@@ -268,7 +268,7 @@ def check_tron_activity(address: str, session: Optional[requests.Session] = None
         if response.status_code == 200:
             data = response.json()
             return len(data.get("data", []))
-    except Exception:
+    except (requests.RequestException, ValueError):
         return 0
     return 0
 
@@ -292,7 +292,7 @@ def check_sol_value(address: str, session: Optional[requests.Session] = None) ->
                 timeout=10,
             )
             sol_price = price_resp.json().get("solana", {}).get("usd", 0)
-        except Exception:
+        except (requests.RequestException, ValueError):
             sol_price = FALLBACK_SOL_PRICE  # fallback guardrail for offline/blocked price lookups
 
         sol_usd_value = sol_balance * sol_price
@@ -313,7 +313,7 @@ def check_sol_value(address: str, session: Optional[requests.Session] = None) ->
             if tokens:
                 return sol_usd_value + (TOKEN_HEURISTIC_VALUE * len(tokens))  # tiny heuristic for token presence
         return sol_usd_value
-    except Exception:
+    except (requests.RequestException, ValueError):
         return 0.0
 
 
@@ -388,6 +388,7 @@ class WalletHunter:
 
         self._phase_log(phrase, trx_address, sol_address, trx_txs, sol_val, verify_flag)
 
+        # Persist any wallet with positive USD value (per requirement), even if below alert thresholds.
         should_save = sol_val > 0 or active
         if should_save:
             self._record_hit(phrase, trx_address, trx_txs, sol_address, sol_val)
