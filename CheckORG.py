@@ -30,6 +30,7 @@ TOKEN_HEURISTIC_VALUE = 0.000001
 generated_phrases: Set[str] = set()
 MNEMONIC_GENERATOR = Bip39MnemonicGenerator()
 VALID_WORD_COUNTS = (12, 15, 18, 21, 24)
+BIP39_WORDLIST_SIZE = 2048
 WORDS_NUM_MAP = {
     12: Bip39WordsNum.WORDS_NUM_12,
     15: Bip39WordsNum.WORDS_NUM_15,
@@ -40,7 +41,9 @@ WORDS_NUM_MAP = {
 
 
 def _get_words_num(word_count: int) -> Bip39WordsNum:
-    return WORDS_NUM_MAP.get(word_count, Bip39WordsNum.WORDS_NUM_12)
+    if word_count not in WORDS_NUM_MAP:
+        raise ValueError(f"Unsupported word count: {word_count}")
+    return WORDS_NUM_MAP[word_count]
 
 
 def generate_random_phrase(word_count: int = 12) -> str:
@@ -140,6 +143,8 @@ class WalletHunter:
         hits_file: Optional[str] = None,
         max_checks: Optional[int] = None,
     ):
+        if word_count not in VALID_WORD_COUNTS:
+            raise ValueError(f"Unsupported word count: {word_count}")
         self.word_count = word_count
         self.min_trx_txs = min_trx_txs
         self.min_sol_value = min_sol_value
@@ -186,7 +191,7 @@ class WalletHunter:
             trx_address = derive_trx_address(phrase)
             sol_address = derive_sol_address(phrase)
         except (MnemonicChecksumError, ValueError):
-            # Skip invalid mnemonic (bad checksum/word/validation error) without stopping worker threads
+            # Skip invalid mnemonic (bad checksum/word/validation error from bip_utils) without stopping worker threads
             return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
@@ -263,7 +268,7 @@ def main():
     args = parser.parse_args()
 
     if args.mode == "health":
-        print("Wordlist size: 2048 (BIP-39 English)")
+        print(f"Wordlist size: {BIP39_WORDLIST_SIZE} (BIP-39 English)")
         print("Dependencies: requests, bip_utils")
         return
 
