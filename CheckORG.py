@@ -18,6 +18,12 @@ from bip_utils import (
 # - Multi-phase checks with optional verification
 # - Throttle support to keep CPU usage low
 
+MAX_PHRASE_ATTEMPTS = 1000
+# Fallback price guardrail (manual) in case price API is blocked/offline. Updated 2026-01.
+FALLBACK_SOL_PRICE = 150
+# Tiny heuristic bump when tokens exist but SOL balance is zero.
+TOKEN_HEURISTIC_VALUE = 0.000001
+
 BIP39_WORDS = [
     "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "accent",
     "accept", "access", "accident", "account", "accuse", "achieve", "acid", "acoustic", "acquire", "across",
@@ -227,8 +233,7 @@ generated_phrases: Set[str] = set()
 
 
 def generate_random_phrase(word_count: int = 12) -> str:
-    max_attempts = 1000
-    for _ in range(max_attempts):
+    for _ in range(MAX_PHRASE_ATTEMPTS):
         words = [secrets.choice(BIP39_WORDS) for _ in range(word_count)]
         phrase = " ".join(words)
         if phrase not in generated_phrases:
@@ -276,7 +281,8 @@ def check_sol_value(address: str, session: Optional[requests.Session] = None) ->
         resp = sess.post(rpc_url, json=payload, timeout=10)
         sol_balance = 0
         if resp.status_code == 200:
-            lamports = resp.json().get("result", {}).get("value", 0)
+            result = resp.json().get("result", {})
+            lamports = result.get("value", 0)
             sol_balance = lamports / 10**9
 
         sol_price = 0
@@ -287,7 +293,7 @@ def check_sol_value(address: str, session: Optional[requests.Session] = None) ->
             )
             sol_price = price_resp.json().get("solana", {}).get("usd", 0)
         except Exception:
-            sol_price = 150
+            sol_price = FALLBACK_SOL_PRICE  # fallback guardrail for offline/blocked price lookups
 
         sol_usd_value = sol_balance * sol_price
 
@@ -305,7 +311,7 @@ def check_sol_value(address: str, session: Optional[requests.Session] = None) ->
         if token_resp.status_code == 200:
             tokens = token_resp.json().get("result", {}).get("value", [])
             if tokens:
-                return sol_usd_value + (0.000001 * len(tokens))
+                return sol_usd_value + (TOKEN_HEURISTIC_VALUE * len(tokens))  # tiny heuristic for token presence
         return sol_usd_value
     except Exception:
         return 0.0
@@ -374,6 +380,7 @@ class WalletHunter:
         active = trx_txs >= self.min_trx_txs or sol_val >= self.min_sol_value
 
         if active and verify_flag:
+            # Re-check both metrics to guard against transient spikes or stale data
             time.sleep(self.delay)
             trx_txs = check_tron_activity(trx_address, self.session)
             sol_val = check_sol_value(sol_address, self.session)
@@ -381,14 +388,11 @@ class WalletHunter:
 
         self._phase_log(phrase, trx_address, sol_address, trx_txs, sol_val, verify_flag)
 
-        saved = False
-        if sol_val > 0:
+        should_save = sol_val > 0 or active
+        if should_save:
             self._record_hit(phrase, trx_address, trx_txs, sol_address, sol_val)
-            saved = True
 
         if active:
-            if not saved:
-                self._record_hit(phrase, trx_address, trx_txs, sol_address, sol_val)
             self.stop_event.set()
             return True
         return False
