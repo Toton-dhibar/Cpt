@@ -46,11 +46,9 @@ def _get_words_num(word_count: int) -> Bip39WordsNum:
 
 
 def _get_mnemonic_generator() -> Bip39MnemonicGenerator:
-    generator = getattr(_GENERATOR_LOCAL, "generator", None)
-    if generator is None:
-        generator = Bip39MnemonicGenerator()
-        _GENERATOR_LOCAL.generator = generator
-    return generator
+    if not hasattr(_GENERATOR_LOCAL, "generator"):
+        _GENERATOR_LOCAL.generator = Bip39MnemonicGenerator()
+    return _GENERATOR_LOCAL.generator
 
 
 def generate_random_phrase(word_count: int = 12) -> str:
@@ -199,8 +197,8 @@ class WalletHunter:
             trx_address = derive_trx_address(phrase)
             sol_address = derive_sol_address(phrase)
         except (MnemonicChecksumError, ValueError):
-            # bip_utils raises MnemonicChecksumError for checksum issues and ValueError for invalid words/length
-            # during derivation; skip these to keep worker threads alive without masking other errors
+            # bip_utils raises MnemonicChecksumError for checksum issues and ValueError when words are not
+            # in the BIP-39 list; skip these to keep worker threads alive without masking other errors
             return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
