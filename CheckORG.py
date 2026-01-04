@@ -149,8 +149,6 @@ class WalletHunter:
         hits_file: Optional[str] = None,
         max_checks: Optional[int] = None,
     ):
-        if word_count not in VALID_WORD_COUNTS:
-            raise ValueError(f"Unsupported word count: {word_count}")
         self.word_count = word_count
         self.min_trx_txs = min_trx_txs
         self.min_sol_value = min_sol_value
@@ -197,7 +195,8 @@ class WalletHunter:
             trx_address = derive_trx_address(phrase)
             sol_address = derive_sol_address(phrase)
         except (MnemonicChecksumError, ValueError):
-            # Skip invalid mnemonics (checksum errors or invalid words) to prevent thread crashes
+            # Skip invalid mnemonics from derive_trx_address/derive_sol_address (checksum errors or invalid words)
+            # to prevent thread crashes
             return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
