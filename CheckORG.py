@@ -10,6 +10,8 @@ from bip_utils import (
     Bip44,
     Bip44Coins,
     Bip44Changes,
+    Bip39MnemonicGenerator,
+    Bip39WordsNum,
 )
 
 # Single lightweight script tuned for Termux:
@@ -232,14 +234,24 @@ BIP39_WORDS = [
 generated_phrases: Set[str] = set()
 
 
+def _get_words_num(word_count: int) -> Bip39WordsNum:
+    return {
+        12: Bip39WordsNum.WORDS_NUM_12,
+        15: Bip39WordsNum.WORDS_NUM_15,
+        18: Bip39WordsNum.WORDS_NUM_18,
+        21: Bip39WordsNum.WORDS_NUM_21,
+        24: Bip39WordsNum.WORDS_NUM_24,
+    }.get(word_count, Bip39WordsNum.WORDS_NUM_12)
+
+
 def generate_random_phrase(word_count: int = 12) -> str:
+    words_num = _get_words_num(word_count)
     for _ in range(MAX_PHRASE_ATTEMPTS):
-        words = [secrets.choice(BIP39_WORDS) for _ in range(word_count)]
-        phrase = " ".join(words)
+        phrase = str(Bip39MnemonicGenerator().FromWordsNumber(words_num))
         if phrase not in generated_phrases:
             generated_phrases.add(phrase)
             return phrase
-    return " ".join(secrets.choice(BIP39_WORDS) for _ in range(word_count))
+    return str(Bip39MnemonicGenerator().FromWordsNumber(words_num))
 
 
 def derive_trx_address(phrase: str) -> str:
@@ -371,8 +383,11 @@ class WalletHunter:
     def process_phrase(self, phrase: str, verify_override: Optional[bool] = None) -> bool:
         verify_flag = self.verify if verify_override is None else verify_override
 
-        trx_address = derive_trx_address(phrase)
-        sol_address = derive_sol_address(phrase)
+        try:
+            trx_address = derive_trx_address(phrase)
+            sol_address = derive_sol_address(phrase)
+        except Exception:
+            return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
         sol_val = check_sol_value(sol_address, self.session)
