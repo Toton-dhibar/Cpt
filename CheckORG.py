@@ -29,16 +29,18 @@ TOKEN_HEURISTIC_VALUE = 0.000001
 
 generated_phrases: Set[str] = set()
 MNEMONIC_GENERATOR = Bip39MnemonicGenerator()
+VALID_WORD_COUNTS = (12, 15, 18, 21, 24)
+WORDS_NUM_MAP = {
+    12: Bip39WordsNum.WORDS_NUM_12,
+    15: Bip39WordsNum.WORDS_NUM_15,
+    18: Bip39WordsNum.WORDS_NUM_18,
+    21: Bip39WordsNum.WORDS_NUM_21,
+    24: Bip39WordsNum.WORDS_NUM_24,
+}
 
 
 def _get_words_num(word_count: int) -> Bip39WordsNum:
-    return {
-        12: Bip39WordsNum.WORDS_NUM_12,
-        15: Bip39WordsNum.WORDS_NUM_15,
-        18: Bip39WordsNum.WORDS_NUM_18,
-        21: Bip39WordsNum.WORDS_NUM_21,
-        24: Bip39WordsNum.WORDS_NUM_24,
-    }.get(word_count, Bip39WordsNum.WORDS_NUM_12)
+    return WORDS_NUM_MAP.get(word_count, Bip39WordsNum.WORDS_NUM_12)
 
 
 def generate_random_phrase(word_count: int = 12) -> str:
@@ -239,7 +241,7 @@ class WalletHunter:
             phrase = input("\nEnter mnemonic phrase (or 'exit'): ").strip()
             if phrase.lower() == "exit":
                 break
-            if len(phrase.split()) not in [12, 15, 18, 21, 24]:
+            if len(phrase.split()) not in VALID_WORD_COUNTS:
                 print("Invalid phrase length.")
                 continue
             self.process_phrase(phrase, verify_override=self.verify)
