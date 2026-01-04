@@ -197,8 +197,7 @@ class WalletHunter:
             trx_address = derive_trx_address(phrase)
             sol_address = derive_sol_address(phrase)
         except (MnemonicChecksumError, ValueError):
-            # bip_utils raises MnemonicChecksumError for checksum issues and ValueError when words are not
-            # in the BIP-39 list; skip these to keep worker threads alive without masking other errors
+            # Skip invalid mnemonics (checksum errors or invalid words) to prevent thread crashes
             return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
