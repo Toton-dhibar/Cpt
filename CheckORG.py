@@ -28,6 +28,7 @@ FALLBACK_SOL_PRICE = 150  # manual fallback; adjust whenever market price meanin
 TOKEN_HEURISTIC_VALUE = 0.000001
 
 generated_phrases: Set[str] = set()
+# Bip39MnemonicGenerator is stateless; safe to share across threads
 MNEMONIC_GENERATOR = Bip39MnemonicGenerator()
 VALID_WORD_COUNTS = (12, 15, 18, 21, 24)
 BIP39_WORDLIST_SIZE = 2048
@@ -191,7 +192,8 @@ class WalletHunter:
             trx_address = derive_trx_address(phrase)
             sol_address = derive_sol_address(phrase)
         except (MnemonicChecksumError, ValueError):
-            # Skip invalid mnemonic (bad checksum/word/validation error from bip_utils) without stopping worker threads
+            # bip_utils raises MnemonicChecksumError for checksum issues and ValueError for invalid words/length;
+            # skip these to keep worker threads alive
             return False
 
         trx_txs = check_tron_activity(trx_address, self.session)
